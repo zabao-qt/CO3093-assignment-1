@@ -72,8 +72,8 @@ class Request():
             first_line = lines[0]
             method, path, version = first_line.split()
 
-            if path == '/':
-                path = '/index.html'
+            # if path == '/':
+            #     path = '/index.html'
         except Exception:
             return None, None
 
@@ -84,10 +84,26 @@ class Request():
         lines = request.split('\r\n')
         headers = {}
         for line in lines[1:]:
-            if ': ' in line:
-                key, val = line.split(': ', 1)
-                headers[key.lower()] = val
+            if ':' in line:
+                key, val = line.split(':', 1)
+                headers[key.lower().strip()] = val.strip()
         return headers
+    
+    def parse_prepare(self, cookie_string):
+        cookies = {}
+        if not cookie_string:
+            return cookies
+        try:
+            tokens = cookie_string.split(';')
+            
+            for token in tokens:
+                token = token.strip()
+                if '=' in token:
+                    key, value = token.split('=', 1)
+                    cookies[key.strip()] = value.strip()
+        except Exception:
+            print(f"[Request Error] Cookie string is invalid: {cookie_string}")
+        return cookies
 
     def prepare(self, request, routes=None):
         """Prepares the entire request with the given parameters."""
@@ -103,7 +119,7 @@ class Request():
         # TODO manage the webapp hook in this mounting point
         #
         
-        if not routes == {}:
+        if routes is not None and routes != {}:
             self.routes = routes
             self.hook = routes.get((self.method, self.path))
             #
@@ -113,37 +129,68 @@ class Request():
 
         self.headers = self.prepare_headers(request)
         cookies = self.headers.get('cookie', '')
-            #
-            #  TODO: implement the cookie function here
-            #        by parsing the header            #
+        self.cookies = self.parse_prepare(cookies)
 
-        return
+        if self.method in ['POST', 'PUT']:
+            parts = request.split('\r\n\r\n', 1)
+            if len(parts) > 1:
+                self.body = parts[1].strip()
+            else:
+                self.body = ''
+        else:
+            self.body = ''
 
-    def prepare_body(self, data, files, json=None):
-        self.prepare_content_length(self.body)
+        return self
+
+    def prepare_body(self, data=None, files=None, json=None):
+        body = b''
+        if json is not None:
+            self.headers["Content-Type"] = "application/json"
+            import json as js
+            body = js.dumps(json).encode("utf-8")
+
+        # Prepare form data
+        elif data is not None:
+            if isinstance(data, dict):
+                form_data = "&".join(f"{k}={v}" for k, v in data.items())
+                body = form_data.encode("utf-8")
+            else:
+                body = str(data).encode("utf-8")
+            self.headers["Content-Type"] = "application/x-www-form-urlencoded"
+        elif files is not None:
+            self.headers["Content-Type"] = "application/octet-stream"
+            body = files.read()
+
+        self.prepare_content_length(body)
         self.body = body
-        #
-        # TODO prepare the request authentication
-        #
 	# self.auth = ...
         return
 
 
     def prepare_content_length(self, body):
-        self.headers["Content-Length"] = "0"
-        #
-        # TODO prepare the request authentication
-        #
-	# self.auth = ...
+        length = len(body) if body else 0
+        self.headers["Content-Length"] = str(length)
         return
 
 
     def prepare_auth(self, auth, url=""):
-        #
-        # TODO prepare the request authentication
-        #
-	# self.auth = ...
+        import base64
+        if not auth:
+            return
+        if isinstance(auth, tuple) and len(auth) == 2:
+            user_pass = f"{auth[0]}:{auth[1]}".encode("utf-8")
+            encoded = base64.b64encode(user_pass).decode("utf-8")
+            self.headers["Authorization"] = f"Basic {encoded}"
+        elif isinstance(auth, str):
+            self.headers["Authorization"] = f"Bearer {auth}"
         return
 
     def prepare_cookies(self, cookies):
-            self.headers["Cookie"] = cookies
+        if not cookies:
+            return
+        if isinstance(cookies, dict):
+            cookie_str = "; ".join(f"{k}={v}" for k, v in cookies.items())
+        else:
+            cookie_str = str(cookies)
+        self.headers["Cookie"] = cookie_str
+        return
