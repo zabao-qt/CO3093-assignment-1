@@ -102,23 +102,47 @@ class HttpAdapter:
         # Response handler
         resp = self.response
 
+        data = b""
+        while True:
+            chunk = conn.recv(4096)
+            if not chunk:
+                break
+            data += chunk
+            if b"\r\n\r\n" in data:
+                break
+        
         # Handle the request
-        msg = conn.recv(1024).decode()
-        req.prepare(msg, routes)
+        raw_request = data.decode(errors="ignore")
+        req = self.request.prepare(raw_request, routes)
 
         # Handle request hook
         if req.hook:
-            print("[HttpAdapter] hook in route-path METHOD {} PATH {}".format(req.hook._route_path,req.hook._route_methods))
-            req.hook(headers = "bksysnet",body = "get in touch")
+            print(f"[HttpAdapter] Routed to webapp hook for {req.method} {req.path}")
+            try:
+                result = req.hook(headers=req.headers, body=req.body)
+                # result có thể là dict → convert thành JSON bytes
+                if isinstance(result, dict):
+                    import json
+                    body = json.dumps(result).encode("utf-8")
+                    conn.sendall(
+                        b"HTTP/1.1 200 OK\r\n"
+                        b"Content-Type: application/json\r\n"
+                        + f"Content-Length: {len(body)}\r\n\r\n".encode()
+                        + body
+                    )
+                    conn.close()
+                    return
+            except Exception as e:
+                print(f"[HttpAdapter] Hook execution error: {e}")
             #
             # TODO: handle for App hook here
             #
 
         # Build response
-        response = resp.build_response(req)
+        response_bytes = self.response.build_response(req)
 
         #print(response)
-        conn.sendall(response)
+        conn.sendall(response_bytes)
         conn.close()
 
     @property
@@ -131,41 +155,22 @@ class HttpAdapter:
         :rtype: cookies - A dictionary of cookie key-value pairs.
         """
         cookies = {}
-        for header in headers:
-            if header.startswith("Cookie:"):
-                cookie_str = header.split(":", 1)[1].strip()
-                for pair in cookie_str.split(";"):
-                    key, value = pair.strip().split("=")
-                    cookies[key] = value
+        cookie_str = req.headers.get("cookie", "")
+        if cookie_str:
+            for pair in cookie_str.split(";"):
+                if "=" in pair:
+                    k, v = pair.strip().split("=", 1)
+                    cookies[k] = v
         return cookies
 
     def build_response(self, req, resp):
         """Builds a :class:`Response <Response>` object 
 
         :param req: The :class:`Request <Request>` used to generate the response.
-        :param resp: The  response object.
+        :param resp: The response object.
         :rtype: Response
         """
-        response = Response()
-
-        # Set encoding.
-        response.encoding = get_encoding_from_headers(response.headers)
-        response.raw = resp
-        response.reason = response.raw.reason
-
-        if isinstance(req.url, bytes):
-            response.url = req.url.decode("utf-8")
-        else:
-            response.url = req.url
-
-        # Add new cookies from the server.
-        response.cookies = extract_cookies(req)
-
-        # Give the Response some context.
-        response.request = req
-        response.connection = self
-
-        return response
+        return self.response.build_response(req)
 
     # def get_connection(self, url, proxies=None):
         # """Returns a url connection for the given URL. 

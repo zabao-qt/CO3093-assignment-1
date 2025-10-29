@@ -85,6 +85,12 @@ def run_backend(ip, port, routes):
 
         while True:
             conn, addr = server.accept()
+            print(f"[Backend] Connection from {addr}")
+            client_thread = threading.Thread(
+                target=handle_client, args=(ip, port, conn, addr, routes)
+            )
+            client_thread.daemon = True
+            client_thread.start()
             #
             #  TODO: implement the step of the client incoming connection
             #        using multi-thread programming with the
