@@ -41,6 +41,8 @@ PROXY_PASS = {
     "app2.local": ('192.168.56.103', 9002),
 }
 
+#Thêm biến toàn cục
+RR_INDEX = {}
 
 def forward_request(host, port, request):
     """
@@ -112,8 +114,12 @@ def resolve_routing_policy(hostname, routes):
         #   policy
         else:
             # Out-of-handle mapped host
-            proxy_host = '127.0.0.1'
-            proxy_port = '9000'
+            # proxy_host = '127.0.0.1'
+            # proxy_port = '9000'
+            idx = RR_INDEX.get(hostname, 0)
+            choice = proxy_map[idx % len(proxy_map)]
+            RR_INDEX[hostname] = idx + 1
+            proxy_host, proxy_port = choice.split(":", 2)
     else:
         print("[Proxy] resolve route of hostname {} is a singulair to".format(hostname))
         proxy_host, proxy_port = proxy_map.split(":", 2)
@@ -142,9 +148,16 @@ def handle_client(ip, port, conn, addr, routes):
     request = conn.recv(1024).decode()
 
     # Extract hostname
+    hostname = None
     for line in request.splitlines():
         if line.lower().startswith('host:'):
             hostname = line.split(':', 1)[1].strip()
+            break
+    
+    if not hostname:
+        conn.sendall(b"HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n")
+        conn.close()
+        return
 
     print("[Proxy] {} at Host: {}".format(addr, hostname))
 
@@ -155,6 +168,7 @@ def handle_client(ip, port, conn, addr, routes):
         resolved_port = int(resolved_port)
     except ValueError:
         print("Not a valid integer")
+        resolved_port = 9000
 
     if resolved_host:
         print("[Proxy] Host name {} is forwarded to {}:{}".format(hostname,resolved_host, resolved_port))
@@ -199,6 +213,8 @@ def run_proxy(ip, port, routes):
             #        using multi-thread programming with the
             #        provided handle_client routine
             #
+            thread = threading.Thread(target=handle_client, args=(ip, port, conn, addr, routes), daemon=True)
+            thread.start()
     except socket.error as e:
       print("Socket error: {}".format(e))
 
@@ -211,4 +227,4 @@ def create_proxy(ip, port, routes):
     :params routes (dict): dictionary mapping hostnames and location.
     """
 
-    run_proxy(ip, port, routes)
+    run_proxy(ip, port, routes)  
