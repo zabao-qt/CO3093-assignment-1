@@ -302,12 +302,20 @@ class Response():
         mime_type = self.get_mime_type(path)
         print("[Response] {} path {} mime_type {}".format(request.method, request.path, mime_type))
 
-
+        body_text = request.body.decode() if isinstance(request.body, bytes) else (request.body or "")
         if request.method == "POST" and request.path == "/login":
-            body = request.body.decode() if isinstance(request.body, bytes) else request.body
-            print("[Response] Login attempt body:", body)
-            if "username=admin" in body and "password=password" in body:
-                # Auth success -> serve index.html
+            print("[Response] Login attempt body:", body_text)
+            params = {}
+            try:
+                for pair in body_text.split("&"):
+                    if "=" in pair:
+                        k, v = pair.split("=", 1)
+                        params[k] = v
+            except Exception:
+                params = {}
+
+            if params.get("username") == "admin" and params.get("password") == "password":
+                # Auth success -> serve index.html and set cookie
                 mime_type = self.get_mime_type("index.html")
                 base_dir = self.prepare_content_type(mime_type)
                 c_len, self._content = self.build_content("index.html", base_dir)
@@ -323,10 +331,23 @@ class Response():
                 return header + self._content
             else:
                 return self.build_unauthorized()
+            
+        if request.method == "GET" and request.path == "/login":
+            mime_type = self.get_mime_type("login.html")
+            base_dir = self.prepare_content_type(mime_type)
+            c_len, self._content = self.build_content("login.html", base_dir)
+            self._header = (
+                f"HTTP/1.1 200 OK\r\n"
+                f"Content-Type: text/html\r\n"
+                f"Content-Length: {c_len}\r\n"
+                f"Connection: close\r\n"
+                "\r\n"
+            ).encode("utf-8")
+            return self._header + self._content
         
         if request.method == "GET" and request.path == "/":
             cookie_header = request.headers.get("cookie", "")
-            if "auth=true" in cookie_header:
+            if "auth=true" in cookie_header or request.cookies.get("auth") == "true":
                 mime_type = self.get_mime_type("index.html")
                 base_dir = self.prepare_content_type(mime_type)
                 c_len, self._content = self.build_content("index.html", base_dir)

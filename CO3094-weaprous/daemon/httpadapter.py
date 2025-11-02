@@ -119,14 +119,44 @@ class HttpAdapter:
         if req.hook:
             print(f"[HttpAdapter] Routed to webapp hook for {req.method} {req.path}")
             try:
-                result = req.hook(headers=req.headers, body=req.body)
-                # result có thể là dict → convert thành JSON bytes
+                result = None
+                try:
+                    result = req.hook(headers=req.headers, body=req.body)
+                except TypeError:
+                    try:
+                        result = req.hook(req.body)
+                    except TypeError:
+                        try:
+                            result = req.hook()
+                        except TypeError as e:
+                            raise
+
                 if isinstance(result, dict):
                     import json
                     body = json.dumps(result).encode("utf-8")
                     conn.sendall(
                         b"HTTP/1.1 200 OK\r\n"
                         b"Content-Type: application/json\r\n"
+                        + f"Content-Length: {len(body)}\r\n\r\n".encode()
+                        + body
+                    )
+                    conn.close()
+                    return
+                elif isinstance(result, bytes):
+                    body = result
+                    conn.sendall(
+                        b"HTTP/1.1 200 OK\r\n"
+                        b"Content-Type: application/octet-stream\r\n"
+                        + f"Content-Length: {len(body)}\r\n\r\n".encode()
+                        + body
+                    )
+                    conn.close()
+                    return
+                elif isinstance(result, str):
+                    body = result.encode("utf-8")
+                    conn.sendall(
+                        b"HTTP/1.1 200 OK\r\n"
+                        b"Content-Type: text/html\r\n"
                         + f"Content-Length: {len(body)}\r\n\r\n".encode()
                         + body
                     )
@@ -146,7 +176,7 @@ class HttpAdapter:
         conn.close()
 
     @property
-    def extract_cookies(self, req, resp):
+    def extract_cookies(self, req):
         """
         Build cookies from the :class:`Request <Request>` headers.
 
