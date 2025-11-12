@@ -153,7 +153,6 @@ class Response():
         
         base_dir = ""
 
-        # Processing mime_type based on main_type and sub_type
         main_type, sub_type = mime_type.split('/', 1)
         print("[Response] processing MIME main_type={} sub_type={}".format(main_type,sub_type))
         if main_type == 'text':
@@ -164,15 +163,16 @@ class Response():
                 base_dir = BASE_DIR+"www/"
             else:
                 handle_text_other(sub_type)
-                # print(f"[Response] Unsupported text subtype: {sub_type}, fallback to text/plain")
-                # self.headers['Content-Type'] = 'text/plain'
-                # base_dir = BASE_DIR + "static/"
         elif main_type == 'image':
             base_dir = BASE_DIR+"static/"
             self.headers['Content-Type']='image/{}'.format(sub_type)
         elif main_type == 'application':
-            base_dir = BASE_DIR+"apps/"
-            self.headers['Content-Type']='application/{}'.format(sub_type)
+            if sub_type in ('javascript', 'x-javascript'):
+                base_dir = BASE_DIR + "static/"
+                self.headers['Content-Type'] = 'application/javascript'
+            else:
+                base_dir = BASE_DIR + "apps/"
+                self.headers['Content-Type'] = 'application/{}'.format(sub_type)
         #
         #  TODO: process other mime_type
         #        application/xml       
@@ -209,6 +209,19 @@ class Response():
                 content = f.read()
             return len(content), content
         except FileNotFoundError:
+            try_fallbacks = [
+                os.path.join(base_dir, "images", "ico", os.path.basename(path)),
+                os.path.join(base_dir, "images", os.path.basename(path)),
+                os.path.join(base_dir, os.path.basename(path))
+            ]
+            for fb in try_fallbacks:
+                try:
+                    print("[Response] trying fallback location", fb)
+                    with open(fb, "rb") as f:
+                        content = f.read()
+                    return len(content), content
+                except FileNotFoundError:
+                    continue
             print("[Response] File not found:", filepath)
             return len(b"404 Not Found"), b"404 Not Found"
         except Exception as e:
@@ -236,7 +249,6 @@ class Response():
                 "Cache-Control": "no-cache",
                 "Content-Type": "{}".format(self.headers['Content-Type']),
                 "Content-Length": "{}".format(len(self._content)),
-#                "Cookie": "{}".format(reqhdr.get("Cookie", "sessionid=xyz789")), #dummy cooki
         #
         # TODO prepare the request authentication
         #
@@ -356,6 +368,22 @@ class Response():
             else:
                 return self.build_unauthorized()
             
+        if request.method == "GET" and request.path == "/chat.html":
+            cookie_header = request.headers.get("cookie", "")
+            if "auth=true" in cookie_header:
+                mime_type = self.get_mime_type("chat.html")
+                base_dir = self.prepare_content_type(mime_type)
+                c_len, self._content = self.build_content("chat.html", base_dir)
+                header = (
+                    f"HTTP/1.1 200 OK\r\n"
+                    f"Content-Type: text/html\r\n"
+                    f"Content-Length: {c_len}\r\n"
+                    f"Connection: close\r\n\r\n"
+                ).encode()
+                return header + self._content
+            else:
+                return self.build_unauthorized()
+
         base_dir = ""
         if path.endswith('.html') or mime_type == 'text/html':
             base_dir = self.prepare_content_type(mime_type='text/html')

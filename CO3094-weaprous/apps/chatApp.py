@@ -1,4 +1,3 @@
-# apps/chatApp.py
 import json
 import socket
 from daemon.weaprous import WeApRous
@@ -104,6 +103,50 @@ def create_chatapp():
         except json.JSONDecodeError:
             return {"status": "error", "message": "Invalid JSON body"}
     
+    channels = {}
+
+    @app.route("/create-channel", methods=["POST"])
+    def create_channel(body):
+        try:
+            data = json.loads(body)
+            channel = data.get("channel")
+            if not channel:
+                return {"status": "error", "message": "Missing channel name"}
+            if channel not in channels:
+                channels[channel] = []
+            return {"status": "ok", "message": f"Joined channel {channel}"}
+        except json.JSONDecodeError:
+            return {"status": "error", "message": "Invalid JSON"}
+
+    @app.route("/get-channels", methods=["GET"])
+    def get_channels(_):
+        return {"channels": list(channels.keys())}
+
+    @app.route("/send-channel", methods=["POST"])
+    def send_channel(body):
+        try:
+            data = json.loads(body)
+            channel = data.get("channel")
+            msg = data.get("message")
+            sender = data.get("sender", "anonymous")
+            if not channel or channel not in channels:
+                return {"status": "error", "message": "Unknown channel"}
+            channels[channel].append({"sender": sender, "message": msg})
+            return {"status": "ok", "message": "Message sent"}
+        except json.JSONDecodeError:
+            return {"status": "error", "message": "Invalid JSON"}
+
+    @app.route("/get-messages", methods=["POST"])
+    def get_messages(body):
+        try:
+            data = json.loads(body)
+            channel = data.get("channel")
+            if not channel or channel not in channels:
+                return {"status": "error", "message": "Unknown channel"}
+            return {"status": "ok", "messages": channels[channel]}
+        except json.JSONDecodeError:
+            return {"status": "error", "message": "Invalid JSON"}
+
     return app
 
 

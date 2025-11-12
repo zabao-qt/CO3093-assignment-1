@@ -111,11 +111,9 @@ class HttpAdapter:
             if b"\r\n\r\n" in data:
                 break
         
-        # Handle the request
         raw_request = data.decode(errors="ignore")
         req = self.request.prepare(raw_request, routes)
 
-        # Handle request hook
         if req.hook:
             print(f"[HttpAdapter] Routed to webapp hook for {req.method} {req.path}")
             try:
@@ -168,10 +166,7 @@ class HttpAdapter:
             # TODO: handle for App hook here
             #
 
-        # Build response
         response_bytes = self.response.build_response(req)
-
-        #print(response)
         conn.sendall(response_bytes)
         conn.close()
 
