@@ -1,21 +1,102 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
-    <title>bksysnet@hcmut welcome</title>
-
-    <meta charset="utf-8" />
-    <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="stylesheet" href="css/styles.css" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WeApRous ChatApp</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="/css/styles.css">
 </head>
-
 <body>
-<div>
-    <h1>bksysnet@hcmut  Domain</h1>
-    <p>This domain is for use in illustrative examples in documents.
-    </p>
-  
-       <img src="images/welcome.png" alt="bksysnet at HCMUT" width="500" height="600">  
+<nav class="navbar navbar-expand-lg crazy-nav">
+  <div class="container-fluid px-3 d-flex justify-content-between align-items-center">
+
+    <div class="d-flex align-items-center crazy-logo-container">
+      <span class="navbar-brand mb-0 h3 d-flex align-items-center crazy-brand">
+        <i class="bi bi-lightning-charge-fill crazy-logo-icon me-2"></i>
+        <span class="crazy-brand-text">WeApRous</span>
+      </span>
+    </div>
+
+    <div class="d-flex align-items-center gap-2">
+      <button id="btnRefresh" class="btn btn-outline-primary crazy-btn d-flex align-items-center">
+        <i class="bi bi-arrow-repeat me-2"></i>Refresh
+      </button>
+      <button id="btnBroadcast" class="btn btn-outline-success crazy-btn d-flex align-items-center">
+        <i class="bi bi-broadcast-pin me-2"></i>Broadcast
+      </button>
+    </div>
+
+  </div>
+</nav>
+
+<div class="container-fluid mt-3">
+  <div class="row gx-3" style="height: calc(100vh - 96px);">
+    <div class="col-12 col-md-3 d-flex flex-column p-2" id="leftSidebar" style="overflow:auto;">
+      <div class="d-flex align-items-center justify-content-between mb-3">
+        <h6 class="mb-0">Channels</h6>
+      </div>
+
+      <div id="channelsContainer" class="mb-3">
+        <div class="input-group input-group-sm mb-2">
+          <input id="createChannelInput" class="form-control form-control-sm" placeholder="new channel">
+          <button id="btnCreateChannel" class="btn btn-sm btn-primary d-flex align-items-center">
+            <i class="bi bi-plus-lg me-1"></i>Create
+          </button>
+        </div>
+        <div id="channelsList" class="mb-2"></div>
+      </div>
+
+      <div class="mt-auto pt-3 small text-muted">
+        <div class="d-flex align-items-center mb-2">
+          <i class="bi bi-info-circle me-2"></i><span>Tip: Click channel to open</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-md-6 d-flex flex-column p-2">
+      <div id="notifications" class="mb-2"></div>
+
+      <div id="chatWindow" class="border rounded p-3 flex-grow-1 overflow-auto"></div>
+
+      <div class="mt-3 d-flex align-items-center gap-2">
+        <div class="flex-grow-1 position-relative">
+          <input id="messageInput" class="form-control form-control-lg" placeholder="Type a message..." autocomplete="off" />
+        </div>
+        <button id="btnSend" class="btn btn-primary btn-lg d-flex align-items-center" title="Send">
+          <i class="bi bi-send-fill"></i> 
+        </button>
+      </div>
+    </div>
+
+    <div class="col-12 col-md-3 d-flex flex-column p-2" id="rightSidebar" style="overflow:auto;">
+      <div class="d-flex align-items-center justify-content-between mb-2">
+        <h6 class="mb-0">Online Peers</h6>
+        <div class="text-muted small"><i class="bi bi-wifi me-1"></i><span id="peerCount">0</span></div>
+      </div>
+      <ul id="onlinePeers" class="list-group mb-3"></ul>
+
+      <div class="d-flex align-items-center justify-content-between mb-2">
+        <h6 class="mb-0">Connected</h6>
+        <div class="text-muted small"><i class="bi bi-people-fill me-1"></i><span id="connectedCount">0</span></div>
+      </div>
+      <ul id="connectedPeers" class="list-group mb-3"></ul>
+
+      <div class="d-flex align-items-center justify-content-between mb-2">
+        <h6 class="mb-0">Pending</h6>
+        <div></div>
+      </div>
+      <ul id="pendingRequests" class="list-group"></ul>
+    </div>
+  </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{const idEl=document.getElementById('nodeId');const pc=document.getElementById('peerCount');const cc=document.getElementById('connectedCount');setInterval(()=>{try{if(window.myId)idEl.textContent=window.myId;const op=document.querySelectorAll('#onlinePeers li').length;const cp=document.querySelectorAll('#connectedPeers li').length;pc.textContent=op;cc.textContent=cp;}catch(e){}} ,700);});
+</script>
+<script src="/js/chat.js"></script>
 </body>
 </html>

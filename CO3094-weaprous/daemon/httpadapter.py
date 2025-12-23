@@ -1,261 +1,176 @@
-#
-# Copyright (C) 2025 pdnguyen of HCMC University of Technology VNU-HCM.
-# All rights reserved.
-# This file is part of the CO3093/CO3094 course.
-#
-# WeApRous release
-#
-# The authors hereby grant to Licensee personal permission to use
-# and modify the Licensed Source Code for the sole purpose of studying
-# while attending the course
-#
-
-"""
-daemon.httpadapter
-~~~~~~~~~~~~~~~~~
-
-This module provides a http adapter object to manage and persist 
-http settings (headers, bodies). The adapter supports both
-raw URL paths and RESTful route definitions, and integrates with
-Request and Response objects to handle client-server communication.
-"""
-
+import os
+from urllib.parse import unquote
 from .request import Request
 from .response import Response
-from .dictionary import CaseInsensitiveDict
+import json
+
+CORS_HEADERS = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Max-Age": "86400"
+}
 
 class HttpAdapter:
-    """
-    A mutable :class:`HTTP adapter <HTTP adapter>` for managing client connections
-    and routing requests.
-
-    The `HttpAdapter` class encapsulates the logic for receiving HTTP requests,
-    dispatching them to appropriate route handlers, and constructing responses.
-    It supports RESTful routing via hooks and integrates with :class:`Request <Request>` 
-    and :class:`Response <Response>` objects for full request lifecycle management.
-
-    Attributes:
-        ip (str): IP address of the client.
-        port (int): Port number of the client.
-        conn (socket): Active socket connection.
-        connaddr (tuple): Address of the connected client.
-        routes (dict): Mapping of route paths to handler functions.
-        request (Request): Request object for parsing incoming data.
-        response (Response): Response object for building and sending replies.
-    """
-
-    __attrs__ = [
-        "ip",
-        "port",
-        "conn",
-        "connaddr",
-        "routes",
-        "request",
-        "response",
-    ]
+    __attrs__ = ["ip","port","conn","connaddr","routes","request","response"]
 
     def __init__(self, ip, port, conn, connaddr, routes):
-        """
-        Initialize a new HttpAdapter instance.
-
-        :param ip (str): IP address of the client.
-        :param port (int): Port number of the client.
-        :param conn (socket): Active socket connection.
-        :param connaddr (tuple): Address of the connected client.
-        :param routes (dict): Mapping of route paths to handler functions.
-        """
-
-        #: IP address.
         self.ip = ip
-        #: Port.
         self.port = port
-        #: Connection
         self.conn = conn
-        #: Conndection address
         self.connaddr = connaddr
-        #: Routes
         self.routes = routes
-        #: Request
         self.request = Request()
-        #: Response
         self.response = Response()
 
+    def parse_form(self, body):
+        params = {}
+        if not body:
+            return params
+        for pair in body.split("&"):
+            if "=" in pair:
+                k,v = pair.split("=",1)
+                params[k] = unquote(v)
+        return params
+
+    def _write(self, txt):
+        try:
+            self.conn.sendall(txt.encode())
+        finally:
+            try:
+                self.conn.close()
+            except:
+                pass
+
+    def send_json(self, obj, extra_headers=None, status=200, status_text="OK"):
+        txt = json.dumps(obj)
+        lines = [f"HTTP/1.1 {status} {status_text}"]
+        lines.append("Content-Type: application/json")
+        lines.append(f"Content-Length: {len(txt.encode('utf-8'))}")
+        for k,v in CORS_HEADERS.items():
+            lines.append(f"{k}: {v}")
+        if extra_headers:
+            for k,v in extra_headers.items():
+                lines.append(f"{k}: {v}")
+        lines.append("Connection: close")
+        lines.append("")
+        lines.append(txt)
+        self._write("\r\n".join(lines))
+
+    def send_text(self, body, content_type="text/plain", extra_headers=None, status=200, status_text="OK"):
+        b = body if isinstance(body, str) else str(body)
+        lines = [f"HTTP/1.1 {status} {status_text}"]
+        lines.append(f"Content-Type: {content_type}")
+        lines.append(f"Content-Length: {len(b.encode('utf-8'))}")
+        for k,v in CORS_HEADERS.items():
+            lines.append(f"{k}: {v}")
+        if extra_headers:
+            for k,v in extra_headers.items():
+                lines.append(f"{k}: {v}")
+        lines.append("Connection: close")
+        lines.append("")
+        lines.append(b)
+        self._write("\r\n".join(lines))
+
     def handle_client(self, conn, addr, routes):
-        """
-        Handle an incoming client connection.
+        try:
+            raw = conn.recv(8192).decode(errors="ignore")
+        except:
+            conn.close()
+            return
+        if not raw:
+            conn.close()
+            return
 
-        This method reads the request from the socket, prepares the request object,
-        invokes the appropriate route handler if available, builds the response,
-        and sends it back to the client.
-
-        :param conn (socket): The client socket connection.
-        :param addr (tuple): The client's address.
-        :param routes (dict): The route mapping for dispatching requests.
-        """
-
-        # Connection handler.
-        self.conn = conn        
-        # Connection address.
-        self.connaddr = addr
-        # Request handler
         req = self.request
-        # Response handler
         resp = self.response
+        req.prepare(raw, routes)
 
-        data = b""
-        while True:
-            chunk = conn.recv(4096)
-            if not chunk:
-                break
-            data += chunk
-            if b"\r\n\r\n" in data:
-                break
-        
-        raw_request = data.decode(errors="ignore")
-        req = self.request.prepare(raw_request, routes)
+        # compute dynamic CORS origin
+        origin = req.headers.get("origin") or None
+        allow_origin = origin if origin else "*"
+        cors_extra = {
+            "Access-Control-Allow-Origin": allow_origin,
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Max-Age": "86400"
+        }
+
+        if req.method == "OPTIONS":
+            self.send_text("", content_type="text/plain", extra_headers=cors_extra, status=204, status_text="No Content")
+            return
 
         if req.hook:
-            print(f"[HttpAdapter] Routed to webapp hook for {req.method} {req.path}")
             try:
-                result = None
-                try:
-                    result = req.hook(headers=req.headers, body=req.body)
-                except TypeError:
-                    try:
-                        result = req.hook(req.body)
-                    except TypeError:
-                        try:
-                            result = req.hook()
-                        except TypeError as e:
-                            raise
-
-                if isinstance(result, dict):
-                    import json
-                    body = json.dumps(result).encode("utf-8")
-                    conn.sendall(
-                        b"HTTP/1.1 200 OK\r\n"
-                        b"Content-Type: application/json\r\n"
-                        + f"Content-Length: {len(body)}\r\n\r\n".encode()
-                        + body
-                    )
-                    conn.close()
-                    return
-                elif isinstance(result, bytes):
-                    body = result
-                    conn.sendall(
-                        b"HTTP/1.1 200 OK\r\n"
-                        b"Content-Type: application/octet-stream\r\n"
-                        + f"Content-Length: {len(body)}\r\n\r\n".encode()
-                        + body
-                    )
-                    conn.close()
-                    return
-                elif isinstance(result, str):
-                    body = result.encode("utf-8")
-                    conn.sendall(
-                        b"HTTP/1.1 200 OK\r\n"
-                        b"Content-Type: text/html\r\n"
-                        + f"Content-Length: {len(body)}\r\n\r\n".encode()
-                        + body
-                    )
-                    conn.close()
-                    return
+                out = req.hook(headers=req.headers, body=req.body)
             except Exception as e:
-                print(f"[HttpAdapter] Hook execution error: {e}")
-            #
-            # TODO: handle for App hook here
-            #
+                out = {"error":"hook error", "detail": str(e)}
+            if isinstance(out, (dict,list)):
+                self.send_json(out, extra_headers=cors_extra)
+                return
+            if isinstance(out, str):
+                try:
+                    parsed = json.loads(out)
+                    self.send_json(parsed, extra_headers=cors_extra)
+                    return
+                except:
+                    self.send_text(out, content_type="text/plain", extra_headers=cors_extra)
+                    return
+            self.send_text(str(out), content_type="text/plain", extra_headers=cors_extra)
+            return
 
-        response_bytes = self.response.build_response(req)
-        conn.sendall(response_bytes)
-        conn.close()
+        if req.method=="POST" and req.path in ("/login", "/login.html"):
+            body = raw.split("\r\n\r\n",1)[1] if "\r\n\r\n" in raw else ""
+            form = self.parse_form(body)
+            u = form.get("username")
+            p = form.get("password")
+            if u=="admin" and p=="password":
+                extra = {
+                    "Set-Cookie": "auth=true; Path=/",
+                    "Location": "/"
+                }
+                extra.update(cors_extra)
 
-    @property
-    def extract_cookies(self, req):
-        """
-        Build cookies from the :class:`Request <Request>` headers.
+                self.send_text("", content_type="text/plain", extra_headers=extra, status=302, status_text="Found")
+                return
+            else:
+                self.send_text("Unauthorized", content_type="text/plain", extra_headers=cors_extra, status=401, status_text="Unauthorized")
+                return
 
-        :param req:(Request) The :class:`Request <Request>` object.
-        :param resp: (Response) The res:class:`Response <Response>` object.
-        :rtype: cookies - A dictionary of cookie key-value pairs.
-        """
-        cookies = {}
-        cookie_str = req.headers.get("cookie", "")
-        if cookie_str:
-            for pair in cookie_str.split(";"):
-                if "=" in pair:
-                    k, v = pair.strip().split("=", 1)
-                    cookies[k] = v
-        return cookies
+        if req.path=="/index.html":
+            if not (req.cookies and req.cookies.get("auth")=="true"):
+                base = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/www/"
+                path = os.path.join(base, "401.html")
+                try:
+                    with open(path, "rb") as f:
+                        html = f.read()
 
-    def build_response(self, req, resp):
-        """Builds a :class:`Response <Response>` object 
+                    extra = {}
+                    extra.update(cors_extra)
+                    header = (
+                        "HTTP/1.1 401 Unauthorized\r\n"
+                        "Content-Type: text/html\r\n"
+                        f"Content-Length: {len(html)}\r\n"
+                    )
+                    for k,v in extra.items():
+                        header += f"{k}: {v}\r\n"
+                    header += "Connection: close\r\n\r\n"
 
-        :param req: The :class:`Request <Request>` used to generate the response.
-        :param resp: The response object.
-        :rtype: Response
-        """
-        return self.response.build_response(req)
+                    self.conn.sendall(header.encode() + html)
+                    self.conn.close()
+                    return
+                except:
+                    self.send_text("401 Unauthorized", status=401, status_text="Unauthorized", extra_headers=cors_extra)
+                    return
 
-    # def get_connection(self, url, proxies=None):
-        # """Returns a url connection for the given URL. 
+        if req.path.endswith(".html") or req.path.startswith("/static") or req.path.startswith("/css") or req.path.startswith("/js") or req.path.startswith("/images"):
+            out = resp.build_response(req)
+            try:
+                self.conn.sendall(out)
+            finally:
+                try: self.conn.close()
+                except: pass
+            return
 
-        # :param url: The URL to connect to.
-        # :param proxies: (optional) A Requests-style dictionary of proxies used on this request.
-        # :rtype: int
-        # """
-
-        # proxy = select_proxy(url, proxies)
-
-        # if proxy:
-            # proxy = prepend_scheme_if_needed(proxy, "http")
-            # proxy_url = parse_url(proxy)
-            # if not proxy_url.host:
-                # raise InvalidProxyURL(
-                    # "Please check proxy URL. It is malformed "
-                    # "and could be missing the host."
-                # )
-            # proxy_manager = self.proxy_manager_for(proxy)
-            # conn = proxy_manager.connection_from_url(url)
-        # else:
-            # # Only scheme should be lower case
-            # parsed = urlparse(url)
-            # url = parsed.geturl()
-            # conn = self.poolmanager.connection_from_url(url)
-
-        # return conn
-
-
-    def add_headers(self, request):
-        """
-        Add headers to the request.
-
-        This method is intended to be overridden by subclasses to inject
-        custom headers. It does nothing by default.
-
-        
-        :param request: :class:`Request <Request>` to add headers to.
-        """
-        pass
-
-    def build_proxy_headers(self, proxy):
-        """Returns a dictionary of the headers to add to any request sent
-        through a proxy. 
-
-        :class:`HttpAdapter <HttpAdapter>`.
-
-        :param proxy: The url of the proxy being used for this request.
-        :rtype: dict
-        """
-        headers = {}
-        #
-        # TODO: build your authentication here
-        #       username, password =...
-        # we provide dummy auth here
-        #
-        username, password = ("user1", "password")
-
-        if username:
-            headers["Proxy-Authorization"] = (username, password)
-
-        return headers
+        self.send_json({"error":"unknown route"}, extra_headers=cors_extra, status=404, status_text="Not Found")

@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>401 Unauthorized</title>
+<style>
+    :root {
+        --accent: #ff3c7b;
+        --glow: 0 0 25px #ff3c7b, 0 0 50px #ff3c7b;
+        --bg1: #0a0b13;
+        --bg2: #131426;
+        --glass: rgba(255,255,255,0.06);
+        --glass-border: rgba(255,255,255,0.18);
+    }
+
+    body {
+        margin: 0;
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: radial-gradient(circle at center, var(--bg2), var(--bg1));
+        font-family: "Inter", sans-serif;
+        color: #fff;
+        overflow: hidden;
+    }
+
+    /* Animated neon grid background */
+    .grid {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px),
+                    linear-gradient(0deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+        background-size: 50px 50px;
+        animation: gridMove 20s linear infinite;
+    }
+    @keyframes gridMove {
+        0% { transform: translateY(0); }
+        100% { transform: translateY(-50px); }
+    }
+
+    /* Container */
+    .box {
+        position: relative;
+        padding: 40px 60px;
+        border-radius: 18px;
+        background: var(--glass);
+        border: 1px solid var(--glass-border);
+        backdrop-filter: blur(14px);
+        box-shadow: 0 0 30px rgba(0,0,0,0.5), inset 0 0 20px rgba(255,255,255,0.05);
+        text-align: center;
+        animation: popIn 0.8s cubic-bezier(.25,.9,.3,1.2);
+    }
+
+    @keyframes popIn {
+        0% { opacity: 0; transform: scale(0.7) translateY(40px); }
+        100% { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    /* Big 401 number */
+    .error {
+        font-size: 8rem;
+        font-weight: 900;
+        color: var(--accent);
+        text-shadow: var(--glow);
+        letter-spacing: 4px;
+        animation: pulseGlow 2s infinite ease-in-out;
+    }
+
+    @keyframes pulseGlow {
+        0%, 100% { text-shadow: var(--glow); }
+        50% { text-shadow: 0 0 10px #ff3c7b, 0 0 20px #ff3c7b; }
+    }
+
+    /* Subtitle */
+    .msg {
+        margin-top: 10px;
+        font-size: 1.4rem;
+        opacity: 0.85;
+        letter-spacing: 1px;
+    }
+
+    /* Back button */
+    .back {
+        display: inline-block;
+        margin-top: 25px;
+        padding: 12px 26px;
+        font-size: 1.1rem;
+        border-radius: 12px;
+        text-decoration: none;
+        color: #fff;
+        background: var(--accent);
+        box-shadow: var(--glow);
+        transition: 0.25s ease;
+    }
+    .back:hover {
+        transform: scale(1.05);
+        box-shadow: 0 0 35px #ff3c7b;
+    }
+
+</style>
+</head>
+<body>
+
+<div class="grid"></div>
+
+<div class="box">
+    <div class="error">401</div>
+    <div class="msg">Access denied. You're not logged in.</div>
+    <a href="/login" class="back">Go to Login</a>
+</div>
+
+</body>
+</html>

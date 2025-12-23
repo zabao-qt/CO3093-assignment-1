@@ -69,15 +69,12 @@ def parse_virtual_hosts(config_file):
 
         # Find all proxy_pass entries
         proxy_passes = re.findall(r'proxy_pass\s+http://([^\s;]+);', block)
-        # map = proxy_map.get(host,[])
-        # map = map + proxy_passes
-        # proxy_map[host] = map
-        if host not in proxy_map:
-            proxy_map[host] = []
-        proxy_map[host].extend(proxy_passes)
+        map = proxy_map.get(host,[])
+        map = map + proxy_passes
+        proxy_map[host] = map
 
         # Find dist_policy if present
-        policy_match = re.search(r'dist_policy\s+([\w-]+)', block)
+        policy_match = re.search(r'dist_policy\s+(\w+)', block)
         if policy_match:
             dist_policy_map = policy_match.group(1)
         else: #default policy is round_robin
@@ -91,33 +88,16 @@ def parse_virtual_hosts(config_file):
         #       the policy is applied to identify the highes matching
         #       proxy_pass
         #
-
-        #Xử lý multiple proxy_pass entries
-        if len(proxy_passes) > 1:  
-            if dist_policy_map == 'round-robin':
-                select_proxy = proxy_passes[0]
-            else:
-                select_proxy = proxy_passes[0]
-            proxy_map[host] = [select_proxy] 
-        else:
-            proxy_map[host] = proxy_passes
-
         if len(proxy_map.get(host,[])) == 1:
             routes[host] = (proxy_map.get(host,[])[0], dist_policy_map)
-        #else if:
-        #         TODO:  apply further policy matching here#    
-        elif len(proxy_map[host]) > 1:
-            if dist_policy_map == 'round-robin':
-                select_proxy = proxy_map[host][0]
-            else:
-                select_proxy = proxy_map[host][0]
-            routes[host] = (select_proxy, dist_policy_map)
+        # esle if:
+        #         TODO:  apply further policy matching here
+        #
         else:
-            print(f"Warning: No proxy_pass found for host {host}")
-            routes[host] = (None, dist_policy_map)
+            routes[host] = (proxy_map.get(host,[]), dist_policy_map)
 
     for key, value in routes.items():
-        print(key, value)
+        print("[Proxy] Virtual host:", key, "->", value)
     return routes
 
 
@@ -143,8 +123,4 @@ if __name__ == "__main__":
 
     routes = parse_virtual_hosts("config/proxy.conf")
 
-    # #test
-    # print("Parsed routes:")
-    # for host, (proxy, policy) in routes.items():
-    #     print(f"Host: {host} -> Proxy: {proxy}, Policy: {policy}")
     create_proxy(ip, port, routes)
