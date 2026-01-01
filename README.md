@@ -32,7 +32,7 @@ They can understand and design the roles of different types of processes, i.e., 
 
 --- -->
 
-# 🌐✨ **WeApRous – Hybrid Chat Application**
+# **WeApRous – Hybrid Chat Application**
 
 <p align="center">
   <strong>Computer Networks – CO3093 / CO3094</strong><br>
@@ -41,26 +41,14 @@ They can understand and design the roles of different types of processes, i.e., 
 
 ---
 
-## 🚀 Overview
+## Overview
 
-**WeApRous** is a **hybrid chat application** built completely from scratch using **raw TCP sockets and a self-implemented HTTP framework** (no Flask, no Django, no Express).
+**WeApRous** is a **hybrid chat application** built from scratch using raw TCP sockets and a self-implemented HTTP framework .
 The system combines **Client–Server** and **Peer‑to‑Peer (P2P)** networking models into a single, coherent real‑time chat platform.
 
-> 💡 This project demonstrates deep understanding of **network protocols**, **socket programming**, **HTTP**, **cookie-based authentication**, and **distributed system architecture**.
-
 ---
 
-## 🧠 Key Concepts Demonstrated
-
-* 🔐 **HTTP Cookie-based Authentication** (custom implementation)
-* 🌍 **Client–Server Architecture** (Tracker & Channel Backend)
-* 🔗 **Peer‑to‑Peer Communication** (direct TCP, no relay)
-* 🔄 **Hybrid Networking Model**
-* ⚙️ **Concurrent Socket Programming** (multi-threaded)
-
----
-
-## 🏗️ System Architecture
+## System Architecture
 
 ```text
 Browser UI
@@ -81,7 +69,7 @@ WebApp (HTTP Server + REST API)
 Other Peer Nodes (TCP)
 ```
 
-🧩 **Components**:
+**Components**:
 
 | Component             | Description                                             |
 | --------------------- | ------------------------------------------------------- |
@@ -92,7 +80,7 @@ Other Peer Nodes (TCP)
 
 ---
 
-## 🔐 Authentication Flow (HTTP Cookies)
+## Authentication Flow
 
 1. User accesses `/login`
 2. Server validates credentials
@@ -109,22 +97,22 @@ Other Peer Nodes (TCP)
 
 ---
 
-## 💬 Chat Features
+## Chat Features
 
-### 🔗 Peer‑to‑Peer Chat (TCP)
+### Peer‑to‑Peer Chat (TCP)
 
 * Direct socket connection between peers
 * No server relay after handshake
 * Real‑time message delivery
 * UI shows **sent & received messages** distinctly
 
-### 📢 Broadcast Messaging
+### Broadcast Messaging
 
 * One‑to‑many messaging over TCP
 * Delivered to all connected peers
 * Highlighted UI bubbles + notifications
 
-### 🧵 Channel Chat (Client–Server)
+### Channel Chat (Client–Server)
 
 * Create & join channels
 * Messages stored centrally (JSON persistence)
@@ -133,7 +121,7 @@ Other Peer Nodes (TCP)
 
 ---
 
-## 🔄 End‑to‑End Workflow
+## End‑to‑End Workflow
 
 ### 1️⃣ Start the system
 
@@ -146,7 +134,7 @@ python start_chatapp.py --ui-port 8001 --peer-port 7001 --my-ip 127.0.0.1
 python start_chatapp.py --ui-port 8002 --peer-port 7002 --my-ip 127.0.0.1
 ```
 
-Each ChatApp instance automatically:
+Each ChatApp instance will:
 
 * Registers itself to the tracker
 * Starts its own PeerNode (TCP server)
@@ -187,7 +175,7 @@ http://127.0.0.1:8001/login
 
 ---
 
-## 📡 REST API
+## REST API
 
 | Method | Endpoint           | Description                      |
 | ------ | ------------------ | -------------------------------- |
